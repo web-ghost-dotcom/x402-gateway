@@ -1,19 +1,30 @@
 import { Router } from "express";
-import axios from "axios";
 
 const router = Router();
 
 // In-memory storage (replace with database in production)
 // TODO: Replace with MongoDB, PostgreSQL, or other database
-const apiListings = new Map<string, any>();
+interface APIListing {
+  id: string;
+  name: string;
+  description: string;
+  baseUrl: string;
+  apiKey?: string | null;
+  pricePerCall: string;
+  category: string;
+  status: string;
+  source: string;
+  owner: string;
+  totalCalls: number;
+  revenue: string;
+  createdAt: string;
+  updatedAt: string;
+  tags?: string[];
+}
 
-// GitHub OAuth Configuration
-// TODO: Create a GitHub OAuth App and replace these values
-// https://github.com/settings/developers -> New OAuth App
-const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID || "YOUR_GITHUB_CLIENT_ID";
-const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET || "YOUR_GITHUB_CLIENT_SECRET";
-const GITHUB_REDIRECT_URI =
-  process.env.GITHUB_REDIRECT_URI || "http://localhost:5174/api/auth/github/callback";
+export const apiListings = new Map<string, APIListing>();
+
+// API Listings storage
 
 // ==================== API Listing Routes ====================
 
@@ -173,136 +184,6 @@ router.get("/listings/owner/:walletAddress", (req, res) => {
   );
 
   res.json({ success: true, data: userListings });
-});
-
-// ==================== GitHub OAuth Routes ====================
-
-// Initiate GitHub OAuth flow
-router.get("/auth/github", (req, res) => {
-  const state = Math.random().toString(36).substring(7);
-  const scope = "repo,user:email"; // Request repo and email access
-
-  const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${GITHUB_REDIRECT_URI}&scope=${scope}&state=${state}`;
-
-  res.json({
-    success: true,
-    authUrl: githubAuthUrl,
-    state,
-  });
-});
-
-// GitHub OAuth callback
-router.get("/auth/github/callback", async (req, res) => {
-  const { code, state } = req.query;
-
-  if (!code) {
-    return res.status(400).json({
-      success: false,
-      error: "No code provided",
-    });
-  }
-
-  try {
-    // Exchange code for access token
-    const tokenResponse = await axios.post(
-      "https://github.com/login/oauth/access_token",
-      {
-        client_id: GITHUB_CLIENT_ID,
-        client_secret: GITHUB_CLIENT_SECRET,
-        code,
-        redirect_uri: GITHUB_REDIRECT_URI,
-      },
-      {
-        headers: {
-          Accept: "application/json",
-        },
-      },
-    );
-
-    const { access_token } = tokenResponse.data;
-
-    if (!access_token) {
-      throw new Error("No access token received");
-    }
-
-    // Redirect back to frontend with token
-    res.redirect(`http://localhost:5174/api-marketplace?github_token=${access_token}`);
-  } catch (error) {
-    console.error("GitHub OAuth error:", error);
-    res.status(500).json({
-      success: false,
-      error: "Failed to authenticate with GitHub",
-    });
-  }
-});
-
-// Get GitHub user repositories
-router.get("/github/repos", async (req, res) => {
-  const { token } = req.query;
-
-  if (!token) {
-    return res.status(401).json({
-      success: false,
-      error: "GitHub token required",
-    });
-  }
-
-  try {
-    // Get user's repositories
-    const reposResponse = await axios.get("https://api.github.com/user/repos", {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/vnd.github.v3+json",
-      },
-      params: {
-        sort: "updated",
-        per_page: 100,
-      },
-    });
-
-    res.json({
-      success: true,
-      data: reposResponse.data,
-    });
-  } catch (error) {
-    console.error("Error fetching GitHub repos:", error);
-    res.status(500).json({
-      success: false,
-      error: "Failed to fetch GitHub repositories",
-    });
-  }
-});
-
-// Get GitHub user info
-router.get("/github/user", async (req, res) => {
-  const { token } = req.query;
-
-  if (!token) {
-    return res.status(401).json({
-      success: false,
-      error: "GitHub token required",
-    });
-  }
-
-  try {
-    const userResponse = await axios.get("https://api.github.com/user", {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/vnd.github.v3+json",
-      },
-    });
-
-    res.json({
-      success: true,
-      data: userResponse.data,
-    });
-  } catch (error) {
-    console.error("Error fetching GitHub user:", error);
-    res.status(500).json({
-      success: false,
-      error: "Failed to fetch GitHub user info",
-    });
-  }
 });
 
 export default router;
