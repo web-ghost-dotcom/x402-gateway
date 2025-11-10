@@ -1,101 +1,96 @@
 import { Router } from "express";
+import { DatabaseService } from "./db/service.ts";
 
 const router = Router();
-
-// In-memory storage (replace with database in production)
-// TODO: Replace with MongoDB, PostgreSQL, or other database
-interface APIListing {
-  id: string;
-  name: string;
-  description: string;
-  baseUrl: string;
-  apiKey?: string | null;
-  pricePerCall: string;
-  category: string;
-  status: string;
-  source: string;
-  owner: string;
-  totalCalls: number;
-  revenue: string;
-  createdAt: string;
-  updatedAt: string;
-  tags?: string[];
-}
-
-export const apiListings = new Map<string, APIListing>();
-
-// API Listings storage
+const db = new DatabaseService();
 
 // ==================== API Listing Routes ====================
 
 // Get all API listings
-router.get("/listings", (req, res) => {
-  const listings = Array.from(apiListings.values());
-  res.json({ success: true, data: listings });
+router.get("/listings", async (req, res) => {
+  try {
+    const listings = await db.getAllAPIListings();
+    res.json({ success: true, data: listings });
+  } catch (error) {
+    console.error("Error fetching API listings:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch API listings",
+    });
+  }
 });
 
 // Get API listing by ID
-router.get("/listings/:id", (req, res) => {
-  const { id } = req.params;
-  const listing = apiListings.get(id);
+router.get("/listings/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const listing = await db.getAPIListing(id);
 
-  if (!listing) {
-    return res.status(404).json({ success: false, error: "API listing not found" });
+    if (!listing) {
+      return res.status(404).json({ success: false, error: "API listing not found" });
+    }
+
+    res.json({ success: true, data: listing });
+  } catch (error) {
+    console.error("Error fetching API listing:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch API listing",
+    });
   }
-
-  res.json({ success: true, data: listing });
 });
 
 // Create new API listing
-router.post("/listings", (req, res) => {
+router.post("/listings", async (req, res) => {
   try {
+    // Convert camelCase to snake_case for database fields
     const {
       name,
       description,
-      baseUrl,
-      apiKey,
-      pricePerCall,
+      baseUrl: base_url,
+      apiKey: api_key,
+      pricePerCall: price_per_call,
       category,
-      owner,
+      walletAddress: owner,
       source,
-      githubRepo,
     } = req.body;
 
+    // Log the received data for debugging
+    console.log("Received form data:", req.body);
+
     // Validation
-    if (!name || !baseUrl || !pricePerCall || !owner) {
+    if (!name || !base_url || !price_per_call || !owner) {
+      console.log("Missing fields:", {
+        name: !name,
+        base_url: !base_url,
+        price_per_call: !price_per_call,
+        owner: !owner,
+      });
       return res.status(400).json({
         success: false,
-        error: "Missing required fields: name, baseUrl, pricePerCall, owner",
+        error: "Missing required fields: name, baseUrl, pricePerCall, walletAddress",
       });
     }
 
-    // Generate unique ID
-    const id = `api_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
     const newListing = {
-      id,
       name,
       description: description || "",
-      baseUrl,
-      apiKey: apiKey || null,
-      pricePerCall,
+      base_url,
+      api_key: api_key || null,
+      price_per_call,
       category: category || "Uncategorized",
-      tags: [],
-      status: "active",
       source: source || "manual",
-      githubRepo: githubRepo || null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
       owner,
-      totalCalls: 0,
-      revenue: "0 sats",
+      status: "active",
+      total_calls: 0,
+      revenue: "0",
     };
 
-    apiListings.set(id, newListing);
+    const createdListing = await db.createAPIListing(newListing);
 
     res.status(201).json({
       success: true,
-      data: newListing,
+      data: createdListing,
       message: "API listing created successfully",
     });
   } catch (error) {
@@ -108,10 +103,10 @@ router.post("/listings", (req, res) => {
 });
 
 // Update API listing
-router.put("/listings/:id", (req, res) => {
+router.put("/listings/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const listing = apiListings.get(id);
+    const listing = await db.getAPIListing(id);
 
     if (!listing) {
       return res.status(404).json({ success: false, error: "API listing not found" });
@@ -122,15 +117,10 @@ router.put("/listings/:id", (req, res) => {
       return res.status(403).json({ success: false, error: "Unauthorized" });
     }
 
-    const updatedListing = {
-      ...listing,
+    const updatedListing = await db.updateAPIListing(id, {
       ...req.body,
-      id, // Prevent ID from being changed
       owner: listing.owner, // Prevent owner from being changed
-      updatedAt: new Date().toISOString(),
-    };
-
-    apiListings.set(id, updatedListing);
+    });
 
     res.json({
       success: true,
@@ -147,10 +137,10 @@ router.put("/listings/:id", (req, res) => {
 });
 
 // Delete API listing
-router.delete("/listings/:id", (req, res) => {
+router.delete("/listings/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const listing = apiListings.get(id);
+    const listing = await db.getAPIListing(id);
 
     if (!listing) {
       return res.status(404).json({ success: false, error: "API listing not found" });
@@ -161,7 +151,7 @@ router.delete("/listings/:id", (req, res) => {
       return res.status(403).json({ success: false, error: "Unauthorized" });
     }
 
-    apiListings.delete(id);
+    await db.deleteAPIListing(id);
 
     res.json({
       success: true,
@@ -177,13 +167,56 @@ router.delete("/listings/:id", (req, res) => {
 });
 
 // Get listings by owner
-router.get("/listings/owner/:walletAddress", (req, res) => {
-  const { walletAddress } = req.params;
-  const userListings = Array.from(apiListings.values()).filter(
-    listing => listing.owner === walletAddress,
-  );
+router.get("/listings/owner/:walletAddress", async (req, res) => {
+  try {
+    const { walletAddress } = req.params;
+    const listings = await db.getAPIListingsByOwner(walletAddress);
+    res.json({ success: true, data: listings });
+  } catch (error) {
+    console.error("Error fetching user listings:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch user listings",
+    });
+  }
+});
 
-  res.json({ success: true, data: userListings });
+// Record API usage
+router.post("/listings/:id/usage", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { user_address, success, error, cost } = req.body;
+
+    // Validation
+    if (!user_address || typeof success !== "boolean" || !cost) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required fields: user_address, success, cost",
+      });
+    }
+
+    const usage = await db.recordAPIUsage({
+      api_id: id,
+      user_address,
+      success,
+      error: error || null,
+      cost,
+    });
+
+    const stats = await db.getAPIUsageStats(id);
+
+    res.json({
+      success: true,
+      data: { usage, stats },
+      message: "API usage recorded successfully",
+    });
+  } catch (error) {
+    console.error("Error recording API usage:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to record API usage",
+    });
+  }
 });
 
 export default router;

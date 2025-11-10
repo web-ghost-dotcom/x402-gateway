@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React from "react";
 import { Search, Link as LinkIcon } from "lucide-react";
 
 const NewProject: React.FC = () => {
-  const [selectedRepo, setSelectedRepo] = useState<string>("");
+  // repo selection isn't used in this view yet
+  // repo selection isn't used in this view yet
 
   const repos = [
     { name: "Weather-API", date: "Oct 28", icon: "⚡" },
@@ -124,7 +125,9 @@ const NewProject: React.FC = () => {
                     className={`flex items-center justify-between p-4 hover:bg-gray-800 cursor-pointer ${
                       index !== 0 ? "border-t border-gray-800" : ""
                     }`}
-                    onClick={() => setSelectedRepo(repo.name)}
+                    onClick={() => {
+                      /* selection not used yet */
+                    }}
                   >
                     <div className="flex items-center space-x-3">
                       <span className="text-2xl">{repo.icon}</span>
@@ -163,7 +166,7 @@ const NewProject: React.FC = () => {
                   className="bg-gray-900 border border-gray-800 rounded-lg p-6 hover:border-gray-700 cursor-pointer transition-colors"
                 >
                   <div className="flex items-start space-x-4">
-                    <div className="w-20 h-20 bg-white rounded flex items-center justify-center text-4xl flex-shrink-0">
+                    <div className="w-20 h-20 bg-white rounded flex items-center justify-center text-4xl shrink-0">
                       {template.image}
                     </div>
                     <div className="flex-1">

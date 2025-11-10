@@ -1,13 +1,16 @@
 import { config } from "dotenv";
 import express from "express";
 import cors from "cors";
-import { paymentMiddleware, Resource, type SolanaAddress } from "x402-express";
-import apiRoutes from "./routes.js";
+import { paymentMiddleware, type SolanaAddress } from "x402-express";
+import apiRoutes from "./routes.ts";
+import { initializeDatabase } from "./db/init.ts";
+import { DatabaseService } from "./db/service.ts";
 
 config();
 
-const facilitatorUrl = process.env.FACILITATOR_URL as Resource;
-const payTo = process.env.ADDRESS as `0x${string}` | SolanaAddress;
+const PORT = process.env.PORT || 4021;
+const facilitatorUrl = process.env.FACILITATOR_URL as `${string}://${string}`;
+const payTo = process.env.ADDRESS as SolanaAddress;
 
 if (!facilitatorUrl || !payTo) {
   console.error("Missing required environment variables");
@@ -15,64 +18,62 @@ if (!facilitatorUrl || !payTo) {
 }
 
 const app = express();
+const db = new DatabaseService();
 
 // Middleware
-app.use(cors({
-  origin: ['http://localhost:5174', 'http://localhost:5173'],
-  credentials: true
-}));
+app.use(
+  cors({
+    origin: ["http://localhost:5174", "http://localhost:5173"],
+    credentials: true,
+  }),
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// API Routes (before payment middleware)
-app.use('/api', apiRoutes);
+interface RouteConfig {
+  price: string;
+  network: "solana-devnet";
+  payTo: string;
+}
 
-app.use(
-  paymentMiddleware(
-    payTo,
-    {
-      "GET /weather": {
-        price: "$0.001",
-        network: "solana-devnet",
-      },
-      "/premium/*": {
-        // Define atomic amounts in any EIP-3009 token
-        price: {
-          amount: "100000",
-          asset: {
-            address: "0xabc",
-            decimals: 18,
-            // omit eip712 for Solana
-            // eip712: {
-            //   name: "WETH",
-            //   version: "1",
-            // },
-          },
-        },
+// Get routes configuration from API listings
+const getRoutesConfig = async (): Promise<Record<string, RouteConfig>> => {
+  const routesConfig: Record<string, RouteConfig> = {};
+  const listings = await db.getAllAPIListings();
+
+  listings.forEach(listing => {
+    // Extract the path from the gateway URL
+    const urlPath = new URL(listing.base_url).pathname;
+    const route = `*${urlPath}/*`;
+
+    routesConfig[route] = {
+      price: listing.price_per_call,
       network: "solana-devnet",
-      },
-    },
-    {
-      url: facilitatorUrl,
-    },
-  ),
-);
-
-app.get("/weather", (req, res) => {
-  res.send({
-    report: {
-      weather: "sunny",
-      temperature: 70,
-    },
+      payTo: listing.owner,
+    };
   });
-});
 
-app.get("/premium/content", (req, res) => {
-  res.send({
-    content: "This is premium content",
+  return routesConfig;
+};
+
+// Initialize database and start server
+initializeDatabase()
+  .then(async () => {
+    console.log("Database initialized successfully");
+
+    // API Routes
+    app.use("/api", apiRoutes);
+
+    // Configure payment middleware with initial routes
+    const initialRoutes = await getRoutesConfig();
+    app.use(paymentMiddleware(payTo, initialRoutes, { url: facilitatorUrl }));
+
+    // Start server
+    app.listen(PORT, () => {
+      console.log(`Server listening at http://localhost:${PORT}`);
+    });
+  })
+  .catch(error => {
+    console.error("Failed to initialize database:", error);
+    process.exit(1);
   });
-});
-
-app.listen(4021, () => {
-  console.log(`Server listening at http://localhost:${4021}`);
-});

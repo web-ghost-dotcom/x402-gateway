@@ -11,11 +11,12 @@ interface AddAPIModalProps {
 const AddAPIModal: React.FC<AddAPIModalProps> = ({ isOpen, onClose, onSubmit }) => {
   const [formData, setFormData] = useState<AddAPIFormData>({
     name: '',
-    baseUrl: '',
     description: '',
+    baseUrl: '',
     apiKey: '',
     pricePerCall: '',
-    category: ''
+    category: '',
+    walletAddress: '',
   });
 
   const [loading, setLoading] = useState(false);
@@ -38,6 +39,16 @@ const AddAPIModal: React.FC<AddAPIModalProps> = ({ isOpen, onClose, onSubmit }) 
     }
     if (!formData.pricePerCall.trim()) {
       setError('Price per call is required');
+      return false;
+    }
+    // price must be a positive number (we allow values like 0.001 or integer sats)
+    const priceNum = parseFloat(formData.pricePerCall.replace(/[^0-9.]/g, ''));
+    if (isNaN(priceNum) || priceNum <= 0) {
+      setError('Price per call must be a number greater than 0');
+      return false;
+    }
+    if (!formData.walletAddress || !formData.walletAddress.trim()) {
+      setError('Wallet address is required');
       return false;
     }
 
@@ -67,11 +78,12 @@ const AddAPIModal: React.FC<AddAPIModalProps> = ({ isOpen, onClose, onSubmit }) 
       // Reset form
       setFormData({
         name: '',
-        baseUrl: '',
         description: '',
+        baseUrl: '',
         apiKey: '',
-        pricePerCall: '',
-        category: ''
+  pricePerCall: '',
+  category: '',
+  walletAddress: ''
       });
       onClose();
     } catch (err) {
@@ -188,6 +200,27 @@ const AddAPIModal: React.FC<AddAPIModalProps> = ({ isOpen, onClose, onSubmit }) 
             </p>
           </div>
 
+          {/* Wallet Address */}
+          <div>
+            <label htmlFor="walletAddress" className="block text-sm font-medium text-gray-300 mb-2">
+              Wallet Address <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                id="walletAddress"
+                name="walletAddress"
+                value={(formData as unknown as { walletAddress?: string }).walletAddress || ''}
+                onChange={handleChange}
+                placeholder="0x... or wallet public address"
+                className="w-full bg-black border border-gray-800 rounded-lg pl-4 pr-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition-colors"
+              />
+            </div>
+            <p className="mt-1 text-xs text-gray-500">
+              The wallet address to receive payments (required)
+            </p>
+          </div>
+
           {/* Price Per Call */}
           <div>
             <label htmlFor="pricePerCall" className="block text-sm font-medium text-gray-300 mb-2">
@@ -201,7 +234,7 @@ const AddAPIModal: React.FC<AddAPIModalProps> = ({ isOpen, onClose, onSubmit }) 
                 name="pricePerCall"
                 value={formData.pricePerCall}
                 onChange={handleChange}
-                placeholder="$0.001 or 100 sats"
+                placeholder="$0.001"
                 className="w-full bg-black border border-gray-800 rounded-lg pl-10 pr-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition-colors"
                 required
               />

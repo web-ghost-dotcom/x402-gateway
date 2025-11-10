@@ -48,6 +48,8 @@ export interface AddAPIFormData {
   apiKey?: string;
   pricePerCall: string;
   category?: string;
+  walletAddress?: string; // owner's wallet provided in the form
+  originalBaseUrl?: string; // keep original URL when we replace baseUrl with gateway URL
 }
 
 export interface GitHubAuthResponse {

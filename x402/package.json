@@ -3,8 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "tsx index.ts",
-    "dev": "tsx watch index.ts",
+    "start": "node --no-warnings --import tsx ./index.ts",
+    "dev": "node --no-warnings --import tsx --watch ./index.ts",
+    "test-api": "node --no-warnings --import tsx ./test-api.ts",
     "format": "prettier -c .prettierrc --write \"**/*.{ts,js,cjs,json,md}\"",
     "format:check": "prettier -c .prettierrc --check \"**/*.{ts,js,cjs,json,md}\"",
     "lint": "eslint . --ext .ts --fix",
@@ -17,12 +18,15 @@
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
     "express": "^4.18.2",
+    "node-fetch": "^3.3.2",
+    "pg": "^8.16.3",
     "x402-express": "^0.6.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.24.0",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.1",
+    "@types/pg": "^8.15.6",
     "@typescript-eslint/eslint-plugin": "^8.29.1",
     "@typescript-eslint/parser": "^8.29.1",
     "eslint": "^9.24.0",

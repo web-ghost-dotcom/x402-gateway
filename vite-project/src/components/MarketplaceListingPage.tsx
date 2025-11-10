@@ -1,44 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { Github, Plus, Search, X, Check, AlertCircle, ExternalLink, Code } from 'lucide-react';
+import { Plus, Check, AlertCircle, Link2, FileText } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import AddAPIModal from './Modals/AddAPIModal';
-import { apiService, githubService } from '../services/api.service';
-import type { APIListing, GitHubRepo, AddAPIFormData } from '../types/marketplace.types';
+import UploadSpecModal from './Modals/UploadSpecModal';
+import PasteUrlModal from './Modals/PasteUrlModal';
+import { apiService } from '../services/api.service';
+import type { APIListing, AddAPIFormData } from '../types/marketplace.types';
 
 interface MarketplaceListingPageProps {
-  onNavigate?: (page: string) => void;
+  // Accept either a state setter (used in several callers) or a simple navigation callback
+  onNavigate?: React.Dispatch<React.SetStateAction<unknown>> | ((page: string) => void);
 }
 
 const MarketplaceListingPage: React.FC<MarketplaceListingPageProps> = ({ onNavigate }) => {
   const { walletAddress } = useAuth();
-  const [view, setView] = useState<'options' | 'github' | 'manual'>('options');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [githubToken, setGithubToken] = useState<string | null>(null);
-  const [githubRepos, setGithubRepos] = useState<GitHubRepo[]>( []);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isPasteUrlModalOpen, setIsPasteUrlModalOpen] = useState(false);
+  
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [apiListings, setApiListings] = useState<APIListing[]>([]);
-
-  // Check for GitHub token in URL (after OAuth callback)
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('github_token');
-    if (token) {
-      setGithubToken(token);
-      setView('github');
-      // Clean URL
-      window.history.replaceState({}, '', window.location.pathname);
-    }
-  }, []);
-
-  // Fetch GitHub repos when token is available
-  useEffect(() => {
-    if (githubToken && view === 'github') {
-      fetchGitHubRepos();
-    }
-  }, [githubToken, view]);
 
   // Fetch API listings
   useEffect(() => {
@@ -54,47 +36,24 @@ const MarketplaceListingPage: React.FC<MarketplaceListingPageProps> = ({ onNavig
     }
   };
 
-  const fetchGitHubRepos = async () => {
-    if (!githubToken) return;
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const repos = await githubService.getUserRepositories(githubToken);
-      setGithubRepos(repos);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch repositories');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleGitHubConnect = async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const { authUrl } = await githubService.initiateOAuth();
-      window.location.href = authUrl;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to connect to GitHub');
-      setLoading(false);
-    }
-  };
-
   const handleManualAdd = () => {
     setIsModalOpen(true);
   };
 
+  const handleOpenUpload = () => setIsUploadModalOpen(true);
+  const handleOpenPasteUrl = () => setIsPasteUrlModalOpen(true);
+
   const handleManualSubmit = async (formData: AddAPIFormData) => {
-    if (!walletAddress) {
-      throw new Error('Please connect your wallet first');
-    }
+    // construct gateway URL
+    const slugBase = formData.name.split(/\s+/).slice(0,2).join('-').toLowerCase() || 'api';
+  const slug = slugBase.replace(/[^a-z0-9-]/g, '');
+    const gatewayUrl = `https://x402-gateway.vercel.app/${slug}`;
 
     const listing = await apiService.createListing({
       ...formData,
-      owner: walletAddress,
+      originalBaseUrl: formData.baseUrl,
+      baseUrl: gatewayUrl,
+      owner: formData.walletAddress || walletAddress || '',
       source: 'manual',
     });
 
@@ -109,44 +68,72 @@ const MarketplaceListingPage: React.FC<MarketplaceListingPageProps> = ({ onNavig
     }, 2000);
   };
 
-  const handleImportFromGitHub = async (repo: GitHubRepo) => {
-    if (!walletAddress) {
-      setError('Please connect your wallet first');
-      return;
-    }
 
-    setLoading(true);
-    setError(null);
-
+  const handleUploadSpec = async (file: File) => {
+  if (!walletAddress) throw new Error('Please connect your wallet first');
+    // For now, just create a stub listing entry — storage/parse flow will be implemented later
+  // intentionally not setting a page-level loading flag; modals show their own loading
     try {
+      // simple slug based on filename
+      const name = file.name.replace(/\.[^.]+$/, '');
+  const slug = name.split(/\s+|[._-]+/).slice(0,2).join('-').toLowerCase().replace(/[^a-z0-9-]/g,'') || 'api';
+      const gatewayUrl = `https://x402-gateway.vercel.app/${slug}`;
+
       const listing = await apiService.createListing({
-        name: repo.name,
-        baseUrl: `https://api.github.com/repos/${repo.full_name}`,
-        description: repo.description || `Imported from GitHub: ${repo.full_name}`,
+        name: name,
+        originalBaseUrl: '',
+        baseUrl: gatewayUrl,
+        description: `Imported spec: ${file.name}`,
         pricePerCall: 'free',
-        category: repo.language || 'Other',
+        category: 'Other',
         owner: walletAddress,
-        source: 'github',
-        githubRepo: repo.html_url,
+        source: 'upload',
       });
 
-      setSuccess(`API "${listing.name}" imported successfully from GitHub!`);
+      setSuccess(`Spec "${listing.name}" uploaded successfully!`);
       await fetchApiListings();
-      
-      setTimeout(() => {
-        setSuccess(null);
-      }, 3000);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to import repository');
+      setTimeout(() => setSuccess(null), 3000);
     } finally {
-      setLoading(false);
+      // modal-level loading is handled inside the modal components
     }
   };
 
-  const filteredRepos = githubRepos.filter(repo =>
-    repo.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (repo.description && repo.description.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const handlePasteUrl = async (url: string) => {
+  if (!walletAddress) throw new Error('Please connect your wallet first');
+  // intentionally not setting a page-level loading flag; modals show their own loading
+    try {
+      // generate slug from domain if possible
+      let slug = 'api';
+      try {
+        const parsed = new URL(url);
+        const host = parsed.hostname.split('.').slice(-2, -0).join('-');
+        slug = host || url.replace(/https?:\/\//, '').split(/\W+/).slice(0,2).join('-');
+      } catch {
+        slug = url.split(/\W+/).slice(0,2).join('-');
+      }
+  slug = slug.toLowerCase().replace(/[^a-z0-9-]/g, '') || 'api';
+      const gatewayUrl = `https://x402-gateway.vercel.app/${slug}`;
+
+      const listing = await apiService.createListing({
+        name: url,
+        originalBaseUrl: url,
+        baseUrl: gatewayUrl,
+        description: `Imported from URL: ${url}`,
+        pricePerCall: 'free',
+        category: 'Other',
+        owner: walletAddress,
+        source: 'url',
+      });
+
+      setSuccess(`API "${listing.name}" imported successfully from URL!`);
+      await fetchApiListings();
+      setTimeout(() => setSuccess(null), 3000);
+    } finally {
+      // modal-level loading is handled inside the modal components
+    }
+  };
+
+  // GitHub import removed — no repository list to filter
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -197,9 +184,8 @@ const MarketplaceListingPage: React.FC<MarketplaceListingPageProps> = ({ onNavig
           </div>
         )}
 
-        {/* Options View */}
-        {view === 'options' && (
-          <div className="max-w-4xl mx-auto">
+  {/* Options View */}
+  <div className="max-w-4xl mx-auto">
             <div className="text-center mb-12">
               <h2 className="text-4xl font-bold mb-4">List Your API on the Marketplace</h2>
               <p className="text-gray-400 text-lg">
@@ -207,204 +193,85 @@ const MarketplaceListingPage: React.FC<MarketplaceListingPageProps> = ({ onNavig
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Import from GitHub */}
-              <div
-                onClick={() => setView('github')}
-                className="bg-gray-900 border border-gray-800 rounded-lg p-8 hover:border-purple-600 cursor-pointer transition-all group"
-              >
-                <div className="flex items-center justify-center w-16 h-16 bg-gray-800 rounded-lg mb-6 group-hover:bg-purple-900/30 transition-colors">
-                  <Github className="w-8 h-8 text-white" />
-                </div>
-                <h3 className="text-2xl font-bold mb-3">Import from GitHub</h3>
-                <p className="text-gray-400 mb-6">
-                  Connect your GitHub account and import repositories directly to the marketplace
-                </p>
-                <ul className="space-y-2 text-sm text-gray-500">
-                  <li className="flex items-center space-x-2">
-                    <Check className="w-4 h-4 text-green-500" />
-                    <span>Quick and easy setup</span>
-                  </li>
-                  <li className="flex items-center space-x-2">
-                    <Check className="w-4 h-4 text-green-500" />
-                    <span>Auto-sync repository details</span>
-                  </li>
-                  <li className="flex items-center space-x-2">
-                    <Check className="w-4 h-4 text-green-500" />
-                    <span>Link to source code</span>
-                  </li>
-                </ul>
-              </div>
-
-              {/* Manual Entry */}
-              <div
-                onClick={handleManualAdd}
-                className="bg-gray-900 border border-gray-800 rounded-lg p-8 hover:border-purple-600 cursor-pointer transition-all group"
-              >
-                <div className="flex items-center justify-center w-16 h-16 bg-gray-800 rounded-lg mb-6 group-hover:bg-purple-900/30 transition-colors">
-                  <Plus className="w-8 h-8 text-white" />
-                </div>
-                <h3 className="text-2xl font-bold mb-3">Add Manually</h3>
-                <p className="text-gray-400 mb-6">
-                  Fill out a form with your API details and list it on the marketplace
-                </p>
-                <ul className="space-y-2 text-sm text-gray-500">
-                  <li className="flex items-center space-x-2">
-                    <Check className="w-4 h-4 text-green-500" />
-                    <span>Full control over details</span>
-                  </li>
-                  <li className="flex items-center space-x-2">
-                    <Check className="w-4 h-4 text-green-500" />
-                    <span>Set custom pricing</span>
-                  </li>
-                  <li className="flex items-center space-x-2">
-                    <Check className="w-4 h-4 text-green-500" />
-                    <span>No GitHub required</span>
-                  </li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* GitHub Import View */}
-        {view === 'github' && (
-          <div>
-            <div className="flex items-center justify-between mb-8">
-              <div>
-                <h2 className="text-3xl font-bold mb-2">Import from GitHub</h2>
-                <p className="text-gray-400">
-                  Select a repository to import to the marketplace
-                </p>
-              </div>
-              <button
-                onClick={() => {
-                  setView('options');
-                  setGithubToken(null);
-                  setGithubRepos([]);
-                }}
-                className="px-4 py-2 border border-gray-700 rounded-lg text-gray-300 hover:bg-gray-800 transition-colors"
-              >
-                ← Back to Options
-              </button>
-            </div>
-
-            {!githubToken ? (
-              <div className="max-w-2xl mx-auto text-center py-12">
-                <div className="bg-gray-900 border border-gray-800 rounded-lg p-12">
-                  <Github className="w-16 h-16 text-white mx-auto mb-6" />
-                  <h3 className="text-2xl font-bold mb-4">Connect to GitHub</h3>
-                  <p className="text-gray-400 mb-8">
-                    Authorize access to your GitHub repositories to import them to the marketplace
-                  </p>
-                  <button
-                    onClick={handleGitHubConnect}
-                    disabled={loading}
-                    className="px-8 py-3 bg-white text-black rounded-lg font-medium hover:bg-gray-200 transition-colors disabled:opacity-50 inline-flex items-center space-x-2"
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* Upload Spec */}
+                  <div
+                    onClick={handleOpenUpload}
+                    className="bg-gray-900 border border-gray-800 rounded-lg p-8 hover:border-purple-600 cursor-pointer transition-all group"
                   >
-                    {loading ? (
-                      <>
-                        <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                        <span>Connecting...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Github className="w-5 h-5" />
-                        <span>Connect GitHub</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div>
-                {/* Search */}
-                <div className="mb-6">
-                  <div className="relative max-w-md">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500" />
-                    <input
-                      type="text"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      placeholder="Search repositories..."
-                      className="w-full bg-black border border-gray-800 rounded-lg pl-10 pr-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
-                    />
-                  </div>
-                </div>
-
-                {/* Repositories List */}
-                {loading ? (
-                  <div className="text-center py-12">
-                    <div className="w-8 h-8 border-2 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                    <p className="text-gray-400">Loading repositories...</p>
-                  </div>
-                ) : filteredRepos.length === 0 ? (
-                  <div className="text-center py-12 bg-gray-900 border border-gray-800 rounded-lg">
-                    <Code className="w-12 h-12 text-gray-600 mx-auto mb-4" />
-                    <p className="text-gray-400">
-                      {searchTerm ? 'No repositories found matching your search' : 'No repositories found'}
+                    <div className="flex items-center justify-center w-16 h-16 bg-gray-800 rounded-lg mb-6 group-hover:bg-purple-900/30 transition-colors">
+                      <FileText className="w-8 h-8 text-white" />
+                    </div>
+                    <h3 className="text-2xl font-bold mb-3">Upload API Spec</h3>
+                    <p className="text-gray-400 mb-6">
+                      Upload an OpenAPI/Swagger, Postman export, or other spec (.json, .yml, .yaml)
                     </p>
+                    <ul className="space-y-2 text-sm text-gray-500">
+                      <li className="flex items-center space-x-2">
+                        <Check className="w-4 h-4 text-green-500" />
+                        <span>Support .json, .yml, .yaml</span>
+                      </li>
+                      <li className="flex items-center space-x-2">
+                        <Check className="w-4 h-4 text-green-500" />
+                        <span>Drag & drop or browse files</span>
+                      </li>
+                    </ul>
                   </div>
-                ) : (
-                  <div className="space-y-0 border border-gray-800 rounded-lg overflow-hidden">
-                    {filteredRepos.map((repo, index) => (
-                      <div
-                        key={repo.id}
-                        className={`bg-gray-900 p-6 flex items-center justify-between hover:bg-gray-850 transition-colors ${
-                          index !== 0 ? 'border-t border-gray-800' : ''
-                        }`}
-                      >
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-3 mb-2">
-                            <h3 className="text-lg font-semibold">{repo.name}</h3>
-                            {repo.private && (
-                              <span className="px-2 py-0.5 bg-yellow-900/30 border border-yellow-900 rounded text-xs text-yellow-300">
-                                Private
-                              </span>
-                            )}
-                            {repo.language && (
-                              <span className="px-2 py-0.5 bg-gray-800 rounded text-xs text-gray-400">
-                                {repo.language}
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-sm text-gray-400 mb-3">
-                            {repo.description || 'No description available'}
-                          </p>
-                          <div className="flex items-center space-x-4 text-xs text-gray-500">
-                            <span>{repo.full_name}</span>
-                            <span>•</span>
-                            <span>Updated {new Date(repo.updated_at).toLocaleDateString()}</span>
-                            <a
-                              href={repo.html_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center space-x-1 text-purple-400 hover:text-purple-300"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <span>View on GitHub</span>
-                              <ExternalLink className="w-3 h-3" />
-                            </a>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => handleImportFromGitHub(repo)}
-                          disabled={loading}
-                          className="ml-6 px-6 py-2.5 bg-purple-600 hover:bg-purple-700 rounded-lg text-white font-medium transition-colors disabled:opacity-50"
-                        >
-                          Import
-                        </button>
-                      </div>
-                    ))}
+
+                  {/* Paste URL */}
+                  <div
+                    onClick={handleOpenPasteUrl}
+                    className="bg-gray-900 border border-gray-800 rounded-lg p-8 hover:border-purple-600 cursor-pointer transition-all group"
+                  >
+                    <div className="flex items-center justify-center w-16 h-16 bg-gray-800 rounded-lg mb-6 group-hover:bg-purple-900/30 transition-colors">
+                      <Link2 className="w-8 h-8 text-white" />
+                    </div>
+                    <h3 className="text-2xl font-bold mb-3">Paste Documentation URL</h3>
+                    <p className="text-gray-400 mb-6">
+                      Paste a URL to your API docs (hosted OpenAPI, Swagger UI, Postman link) to parse
+                    </p>
+                    <ul className="space-y-2 text-sm text-gray-500">
+                      <li className="flex items-center space-x-2">
+                        <Check className="w-4 h-4 text-green-500" />
+                        <span>Supports hosted specs and doc pages</span>
+                      </li>
+                    </ul>
                   </div>
-                )}
-              </div>
-            )}
+
+                  {/* Manual Entry */}
+                  <div
+                    onClick={handleManualAdd}
+                    className="bg-gray-900 border border-gray-800 rounded-lg p-8 hover:border-purple-600 cursor-pointer transition-all group"
+                  >
+                    <div className="flex items-center justify-center w-16 h-16 bg-gray-800 rounded-lg mb-6 group-hover:bg-purple-900/30 transition-colors">
+                      <Plus className="w-8 h-8 text-white" />
+                    </div>
+                    <h3 className="text-2xl font-bold mb-3">Add Manually</h3>
+                    <p className="text-gray-400 mb-6">
+                      Fill out a form with your API details and list it on the marketplace
+                    </p>
+                    <ul className="space-y-2 text-sm text-gray-500">
+                      <li className="flex items-center space-x-2">
+                        <Check className="w-4 h-4 text-green-500" />
+                        <span>Full control over details</span>
+                      </li>
+                      <li className="flex items-center space-x-2">
+                        <Check className="w-4 h-4 text-green-500" />
+                        <span>Set custom pricing</span>
+                      </li>
+                      <li className="flex items-center space-x-2">
+                        <Check className="w-4 h-4 text-green-500" />
+                        <span>No GitHub required</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
           </div>
-        )}
+
+  {/* GitHub import option removed — replaced with Upload and Paste URL options per spec */}
 
         {/* Recently Added APIs */}
-        {apiListings.length > 0 && view === 'options' && (
+        {apiListings.length > 0 && (
           <div className="mt-16">
             <h3 className="text-2xl font-bold mb-6">Recently Added to Marketplace</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -414,7 +281,7 @@ const MarketplaceListingPage: React.FC<MarketplaceListingPageProps> = ({ onNavig
                   className="bg-gray-900 border border-gray-800 rounded-lg p-6 hover:border-gray-700 transition-colors"
                 >
                   <div className="flex items-center space-x-3 mb-4">
-                    <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded flex items-center justify-center">
+                    <div className="w-10 h-10 bg-linear-to-br from-purple-500 to-pink-500 rounded flex items-center justify-center">
                       <span className="text-white font-bold">⚡</span>
                     </div>
                     <div className="flex-1">
@@ -436,11 +303,27 @@ const MarketplaceListingPage: React.FC<MarketplaceListingPageProps> = ({ onNavig
         )}
       </main>
 
-      {/* Add API Modal */}
+      {/* Add API Modals */}
       <AddAPIModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleManualSubmit}
+      />
+      <UploadSpecModal
+        isOpen={isUploadModalOpen}
+        onClose={() => setIsUploadModalOpen(false)}
+        onUpload={async (file: File) => {
+          await handleUploadSpec(file);
+          setIsUploadModalOpen(false);
+        }}
+      />
+      <PasteUrlModal
+        isOpen={isPasteUrlModalOpen}
+        onClose={() => setIsPasteUrlModalOpen(false)}
+        onSubmit={async (url: string) => {
+          await handlePasteUrl(url);
+          setIsPasteUrlModalOpen(false);
+        }}
       />
     </div>
   );

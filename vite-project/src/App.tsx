@@ -49,7 +49,7 @@ const App: React.FC = () => {
       )}
       {currentPage === "marketplace-listing" && (
         <MarketplaceListingPage
-          onNavigate={(page) => setCurrentPage(page as Page)}
+          onNavigate={(page: unknown) => setCurrentPage(page as Page)}
         />
       )}
       {currentPage === "project-overview" && (
