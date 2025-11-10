@@ -81,9 +81,6 @@ const APIDetailPage: React.FC<APIDetailPageProps> = ({ apiId, onBack }) => {
           
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <div className="w-16 h-16 bg-linear-to-br from-purple-500 to-pink-500 rounded flex items-center justify-center">
-                <span className="text-white font-bold text-2xl">⚡</span>
-              </div>
               <div>
                 <h1 className="text-3xl font-bold mb-1">{api.name}</h1>
                 <p className="text-gray-400">{api.description || 'No description'}</p>

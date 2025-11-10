@@ -18,6 +18,7 @@
     "simulate-usage": "node --no-warnings --import tsx ./test/simulate-usage.ts",
     "demo:full-flow": "node --no-warnings --import tsx ./test/demo-full-flow.ts",
     "test:db": "node --no-warnings --import tsx ./test/test-database.ts",
+    "test:gateway-url": "node --no-warnings --import tsx ./test/test-gateway-url-flow.ts",
     "format": "prettier -c .prettierrc --write \"**/*.{ts,js,cjs,json,md}\"",
     "format:check": "prettier -c .prettierrc --check \"**/*.{ts,js,cjs,json,md}\"",
     "lint": "eslint . --ext .ts --fix",
