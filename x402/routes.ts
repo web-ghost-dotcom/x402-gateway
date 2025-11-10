@@ -1,12 +1,12 @@
 import { Router } from "express";
-import { DatabaseService } from "./db/service.ts";
+import { DatabaseService } from "./db/service";
 import {
   parseOpenAPISpec,
   parseYAMLSpec,
   parseDocumentationURL,
   type ParsedEndpoint,
-} from "./db/parsers/index.ts";
-import type { APIEndpoint } from "./db/schema.ts";
+} from "./db/parsers/index";
+import type { APIEndpoint } from "./db/schema";
 
 const router = Router();
 const db = new DatabaseService();

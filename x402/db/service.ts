@@ -1,5 +1,5 @@
-import pool from "./pool.ts";
-import type { APIListing, APIUsage, APIEndpoint } from "./schema.ts";
+import pool from "./pool";
+import type { APIListing, APIUsage, APIEndpoint } from "./schema";
 
 export class DatabaseService {
   /**

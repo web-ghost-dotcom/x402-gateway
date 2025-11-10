@@ -3,9 +3,9 @@ import express from "express";
 import cors from "cors";
 import axios from "axios";
 import { paymentMiddleware, type SolanaAddress } from "x402-express";
-import apiRoutes from "./routes.ts";
-import { initializeDatabase } from "./db/init.ts";
-import { DatabaseService } from "./db/service.ts";
+import apiRoutes from "./routes";
+import { initializeDatabase } from "./db/init";
+import { DatabaseService } from "./db/service";
 
 config();
 

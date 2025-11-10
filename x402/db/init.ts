@@ -1,5 +1,5 @@
-import pool from "./pool.ts";
-import { createTablesSQL } from "./schema.ts";
+import pool from "./pool";
+import { createTablesSQL } from "./schema";
 
 /**
  * Initialize database schema by creating necessary tables and indexes

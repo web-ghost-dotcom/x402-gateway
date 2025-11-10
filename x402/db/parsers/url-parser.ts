@@ -1,6 +1,6 @@
 import axios from "axios";
-import { parseOpenAPISpec, parseYAMLSpec } from "./openapi-parser.ts";
-import type { ParsedAPIInfo, ParserResult } from "./types.ts";
+import { parseOpenAPISpec, parseYAMLSpec } from "./openapi-parser";
+import type { ParsedAPIInfo, ParserResult } from "./types";
 
 /**
  * Parses API documentation from a URL

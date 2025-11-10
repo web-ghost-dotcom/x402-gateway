@@ -1,5 +1,5 @@
-export { parseOpenAPISpec, parseYAMLSpec } from "./openapi-parser.ts";
-export { parseDocumentationURL } from "./url-parser.ts";
+export { parseOpenAPISpec, parseYAMLSpec } from "./openapi-parser";
+export { parseDocumentationURL } from "./url-parser";
 export type {
   ParsedAPIInfo,
   ParsedEndpoint,
