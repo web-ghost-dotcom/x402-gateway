@@ -61,9 +61,7 @@ const App: React.FC = () => {
         <NewProject onNavigate={setCurrentPage} />
       )}
       {currentPage === "marketplace-listing" && (
-        <MarketplaceListingPage
-          onNavigate={handleNavigate}
-        />
+        <MarketplaceListingPage onNavigate={handleNavigate} />
       )}
       {currentPage === "project-overview" && (
         <ProjectOverview onNavigate={setCurrentPage} />
@@ -73,9 +71,9 @@ const App: React.FC = () => {
         <ActivityPageWrapper onNavigate={setCurrentPage} />
       )}
       {currentPage === "api-detail" && selectedApiId && (
-        <APIDetailPageWrapper 
-          apiId={selectedApiId} 
-          onNavigate={setCurrentPage} 
+        <APIDetailPageWrapper
+          apiId={selectedApiId}
+          onNavigate={setCurrentPage}
         />
       )}
       {currentPage === "settings" && (
@@ -86,9 +84,9 @@ const App: React.FC = () => {
 };
 
 // Dashboard Wrapper
-const DashboardWrapper: React.FC<{ onNavigate: (page: Page, apiId?: string) => void }> = ({
-  onNavigate,
-}) => {
+const DashboardWrapper: React.FC<{
+  onNavigate: (page: Page, apiId?: string) => void;
+}> = ({ onNavigate }) => {
   return (
     <div className="min-h-screen bg-black text-white">
       <Header onNavigate={(page) => onNavigate(page)} currentPage="dashboard" />
@@ -110,17 +108,14 @@ const ActivityPageWrapper: React.FC<{ onNavigate: (page: Page) => void }> = ({
 };
 
 // API Detail Page Wrapper
-const APIDetailPageWrapper: React.FC<{ 
+const APIDetailPageWrapper: React.FC<{
   apiId: string;
   onNavigate: (page: Page) => void;
 }> = ({ apiId, onNavigate }) => {
   return (
     <div className="min-h-screen bg-black text-white">
       <Header onNavigate={onNavigate} currentPage="api-detail" />
-      <APIDetailPage 
-        apiId={apiId} 
-        onBack={() => onNavigate("dashboard")}
-      />
+      <APIDetailPage apiId={apiId} onBack={() => onNavigate("dashboard")} />
     </div>
   );
 };
