@@ -5,6 +5,10 @@
   "framework": null,
   "rewrites": [
     {
+      "source": "/:slug/:path*",
+      "destination": "https://x402-gateway.onrender.com/:slug/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

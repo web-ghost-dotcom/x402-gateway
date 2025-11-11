@@ -1,7 +1,6 @@
 import type { APIListing, AddAPIFormData, GitHubRepo, GitHubUser } from '../types/marketplace.types';
 
-const API_BASE_URL = 'http://localhost:4021/api';
-
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4021/api';
 // Backend API response type (snake_case)
 interface APIListingResponse {
   id: string;
