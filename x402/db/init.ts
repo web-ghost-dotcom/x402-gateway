@@ -1,4 +1,4 @@
-import pool from "./pool";
+import pool, { testConnection, executeWithRetry } from "./pool";
 import { createTablesSQL } from "./schema";
 
 /**
@@ -7,6 +7,12 @@ import { createTablesSQL } from "./schema";
  * @throws Error if initialization fails
  */
 export async function initializeDatabase(): Promise<void> {
+  // First, test the connection with retries
+  const connectionOk = await testConnection(5, 2000);
+  if (!connectionOk) {
+    throw new Error("Unable to establish database connection after multiple attempts");
+  }
+
   const client = await pool.connect();
 
   try {
@@ -18,11 +24,11 @@ export async function initializeDatabase(): Promise<void> {
 
     // Commit transaction
     await client.query("COMMIT");
-    console.log("Database initialized successfully");
+    console.log("✅ Database initialized successfully");
   } catch (error) {
     // Rollback on error
     await client.query("ROLLBACK");
-    console.error("Error initializing database:", error);
+    console.error("❌ Error initializing database:", error);
     throw error;
   } finally {
     client.release();

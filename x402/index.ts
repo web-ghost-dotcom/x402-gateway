@@ -6,6 +6,7 @@ import { paymentMiddleware, type SolanaAddress } from "x402-express";
 import apiRoutes from "./routes";
 import { initializeDatabase } from "./db/init";
 import { DatabaseService } from "./db/service";
+import { testConnection, closePool } from "./db/pool";
 
 config();
 
@@ -43,7 +44,7 @@ const userBalances: Record<string, number> = {
 // Middleware
 app.use(
   cors({
-    origin: ["https://x402-gateway.vercel.app","http://localhost:5174", "http://localhost:5173"],
+    origin: ["https://x402-gateway.vercel.app", "http://localhost:5174", "http://localhost:5173"],
     credentials: true,
   }),
 );
@@ -126,11 +127,15 @@ app.post("/gateway/register", (req, res) => {
 /**
  * Gateway health check
  */
-app.get("/gateway/health", (req, res) => {
-  res.json({
-    status: "healthy",
+app.get("/gateway/health", async (req, res) => {
+  const dbHealthy = await testConnection(1, 1000);
+  const overallHealth = dbHealthy ? "healthy" : "degraded";
+
+  res.status(dbHealthy ? 200 : 503).json({
+    status: overallHealth,
     timestamp: new Date().toISOString(),
     registeredApis: Object.keys(apiRegistry).length,
+    database: dbHealthy ? "connected" : "disconnected",
   });
 });
 
@@ -288,7 +293,7 @@ initializeDatabase()
     });
 
     // Start server
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
       console.log(`
 ╔════════════════════════════════════════════════════════╗
 ║                                                        ║
@@ -309,6 +314,55 @@ initializeDatabase()
 ║                                                        ║
 ╚════════════════════════════════════════════════════════╝
       `);
+
+      // Set up periodic connection health check (every 5 minutes)
+      setInterval(async () => {
+        const isHealthy = await testConnection(1, 1000);
+        if (!isHealthy) {
+          console.error("⚠️  Database health check failed!");
+        }
+      }, 5 * 60 * 1000);
+    });
+
+    // Graceful shutdown handlers
+    const gracefulShutdown = async (signal: string) => {
+      console.log(`\n${signal} received. Starting graceful shutdown...`);
+
+      // Stop accepting new connections
+      server.close(async () => {
+        console.log("HTTP server closed");
+
+        try {
+          // Close database pool
+          await closePool();
+          console.log("✅ Graceful shutdown completed");
+          process.exit(0);
+        } catch (error) {
+          console.error("❌ Error during shutdown:", error);
+          process.exit(1);
+        }
+      });
+
+      // Force shutdown after 30 seconds
+      setTimeout(() => {
+        console.error("❌ Forced shutdown after timeout");
+        process.exit(1);
+      }, 30000);
+    };
+
+    // Listen for termination signals
+    process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+    process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+
+    // Handle uncaught exceptions
+    process.on("uncaughtException", (error) => {
+      console.error("❌ Uncaught Exception:", error);
+      gracefulShutdown("UNCAUGHT_EXCEPTION");
+    });
+
+    process.on("unhandledRejection", (reason, promise) => {
+      console.error("❌ Unhandled Rejection at:", promise, "reason:", reason);
+      gracefulShutdown("UNHANDLED_REJECTION");
     });
   })
   .catch(error => {

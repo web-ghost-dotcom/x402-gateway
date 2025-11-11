@@ -1,4 +1,4 @@
-import pool from "./pool";
+import pool, { executeWithRetry } from "./pool";
 import type { APIListing, APIUsage, APIEndpoint } from "./schema";
 
 export class DatabaseService {
@@ -48,8 +48,10 @@ export class DatabaseService {
    * @returns The API listing if found, null otherwise
    */
   async getAPIListing(id: string): Promise<APIListing | null> {
-    const result = await pool.query("SELECT * FROM api_listings WHERE id = $1", [id]);
-    return result.rows[0] || null;
+    return executeWithRetry(async () => {
+      const result = await pool.query("SELECT * FROM api_listings WHERE id = $1", [id]);
+      return result.rows[0] || null;
+    });
   }
 
   /**
@@ -58,8 +60,10 @@ export class DatabaseService {
    * @returns Array of all API listings
    */
   async getAllAPIListings(): Promise<APIListing[]> {
-    const result = await pool.query("SELECT * FROM api_listings ORDER BY created_at DESC");
-    return result.rows;
+    return executeWithRetry(async () => {
+      const result = await pool.query("SELECT * FROM api_listings ORDER BY created_at DESC");
+      return result.rows;
+    });
   }
 
   /**
@@ -69,11 +73,13 @@ export class DatabaseService {
    * @returns Array of API listings owned by the specified address
    */
   async getAPIListingsByOwner(owner: string): Promise<APIListing[]> {
-    const result = await pool.query(
-      "SELECT * FROM api_listings WHERE owner = $1 ORDER BY created_at DESC",
-      [owner],
-    );
-    return result.rows;
+    return executeWithRetry(async () => {
+      const result = await pool.query(
+        "SELECT * FROM api_listings WHERE owner = $1 ORDER BY created_at DESC",
+        [owner],
+      );
+      return result.rows;
+    });
   }
 
   /**
@@ -83,8 +89,10 @@ export class DatabaseService {
    * @returns The API listing if found, null otherwise
    */
   async getAPIListingByName(name: string): Promise<APIListing | null> {
-    const result = await pool.query("SELECT * FROM api_listings WHERE name = $1", [name]);
-    return result.rows[0] || null;
+    return executeWithRetry(async () => {
+      const result = await pool.query("SELECT * FROM api_listings WHERE name = $1", [name]);
+      return result.rows[0] || null;
+    });
   }
 
   /**
@@ -279,11 +287,13 @@ export class DatabaseService {
    * @returns Array of endpoints
    */
   async getEndpointsByAPIId(apiId: string): Promise<APIEndpoint[]> {
-    const result = await pool.query(
-      "SELECT * FROM api_endpoints WHERE api_id = $1 ORDER BY path, method",
-      [apiId],
-    );
-    return result.rows;
+    return executeWithRetry(async () => {
+      const result = await pool.query(
+        "SELECT * FROM api_endpoints WHERE api_id = $1 ORDER BY path, method",
+        [apiId],
+      );
+      return result.rows;
+    });
   }
 
   /**
@@ -293,8 +303,10 @@ export class DatabaseService {
    * @returns The endpoint if found, null otherwise
    */
   async getEndpoint(id: string): Promise<APIEndpoint | null> {
-    const result = await pool.query("SELECT * FROM api_endpoints WHERE id = $1", [id]);
-    return result.rows[0] || null;
+    return executeWithRetry(async () => {
+      const result = await pool.query("SELECT * FROM api_endpoints WHERE id = $1", [id]);
+      return result.rows[0] || null;
+    });
   }
 
   /**
