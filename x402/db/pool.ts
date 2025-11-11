@@ -13,8 +13,8 @@ const poolConfig: PoolConfig = {
     rejectUnauthorized: false, // Required for Supabase's self-signed certificates
   },
   max: parseInt(process.env.DB_POOL_SIZE || "10"), // maximum number of clients in the pool
-  idleTimeoutMillis: 30000, // how long a client is allowed to remain idle before being closed
-  connectionTimeoutMillis: 10000, // increased timeout to 10s
+  idleTimeoutMillis: 30000000, // how long a client is allowed to remain idle before being closed
+  connectionTimeoutMillis: 10000000, // increased timeout to 10s
 };
 
 // Create the connection pool
@@ -24,7 +24,8 @@ const pool = new Pool(poolConfig);
 // it contains if a backend error or network partition happens
 pool.on("error", err => {
   console.error("Unexpected error on idle client", err);
-  process.exit(-1);
+  // Don't exit immediately - let the application handle it
+  // Only log the error for debugging
 });
 
 /**
