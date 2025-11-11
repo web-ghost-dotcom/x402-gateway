@@ -3,6 +3,15 @@ import { config } from "dotenv";
 
 config();
 
+// Debug: Log connection info (without password)
+console.log("🔍 Database Configuration:");
+console.log(`  Host: ${process.env.DB_HOST}`);
+console.log(`  Port: ${process.env.DB_PORT}`);
+console.log(`  Database: ${process.env.DB_NAME}`);
+console.log(`  User: ${process.env.DB_USER}`);
+console.log(`  Password: ${process.env.DB_PASSWORD ? `[${process.env.DB_PASSWORD.length} chars]` : 'NOT SET'}`);
+console.log(`  SSL: ${process.env.DB_SSL}`);
+
 const poolConfig: PoolConfig = {
   host: process.env.DB_HOST,
   port: parseInt(process.env.DB_PORT || "5432"),
